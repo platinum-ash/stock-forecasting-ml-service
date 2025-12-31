@@ -1,6 +1,7 @@
 """
 Kafka consumer - Input adapter for preprocessing completion events.
 """
+import os
 import json
 import logging
 from typing import Optional
@@ -22,7 +23,7 @@ class ForecastingConsumer:
     ):
         self.bootstrap_servers = bootstrap_servers
         self.event_handler = event_handler
-        self.topic = topic
+        self.topic = os.getenv("KAFKA__INPUT_TOPIC", topic)
         self.group_id = group_id
         self.consumer: Optional[AIOKafkaConsumer] = None
         self.is_running = False
