@@ -37,9 +37,11 @@ class ApplicationContainer:
             logger.info("Forecasting service initialized")
         return self._forecasting_service
     
-    def get_kafka_consumer(self) -> ForecastingConsumer:
-        """Get or create Kafka consumer with wired dependencies"""
+    async def initialize_kafka_consumer(self) -> ForecastingConsumer:
+        """Async initialization of Kafka consumer with all dependencies"""
         if self._kafka_consumer is None:
+            logger.info("Initializing Kafka consumer dependencies...")
+            
             service = self.get_forecasting_service()
             publisher = self.get_event_publisher()
             
@@ -48,8 +50,17 @@ class ApplicationContainer:
                 self._bootstrap_servers,
                 event_handler
             )
-            logger.info("Kafka consumer initialized")
+            logger.info("✓ Kafka consumer initialized")
         return self._kafka_consumer
+
+    def get_kafka_consumer(self) -> ForecastingConsumer:
+        """Get already-initialized Kafka consumer"""
+        if self._kafka_consumer is None:
+            raise RuntimeError(
+                "Kafka consumer not initialized. Call initialize_kafka_consumer() first."
+            )
+        return self._kafka_consumer
+
     
     async def shutdown(self):
         """Clean up resources"""

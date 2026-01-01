@@ -41,26 +41,44 @@ async def lifespan(app: FastAPI):
     logger.info("Forecasting service starting...")
     container = get_container()
     
+    consumer_task = None
+    
     try:
-        # Start Kafka consumer in background
-        consumer = container.get_kafka_consumer()
-        asyncio.create_task(consumer.start())
-        logger.info("Kafka consumer started successfully")
+        # Initialize consumer (this is fast - just creates objects)
+        consumer = await container.initialize_kafka_consumer()
+        logger.info("Consumer dependencies ready")
+        
+        # Start consuming in background (this connects to Kafka)
+        consumer_task = asyncio.create_task(consumer.start())
+        logger.info(f"Kafka consumer task started for topic '{consumer.topic}'")
+        
+        # Give it a moment to connect, but don't block startup
+        await asyncio.sleep(0.5)
+        
     except Exception as e:
-        logger.error(f"Failed to start Kafka components: {e}", exc_info=True)
+        logger.error(f"Failed to start Kafka consumer: {e}", exc_info=True)
     
-    yield
+    yield  # FastAPI starts serving immediately
     
+    # Shutdown
     logger.info("Forecasting service shutting down...")
     try:
+        if consumer_task:
+            consumer_task.cancel()
+            try:
+                await consumer_task
+            except asyncio.CancelledError:
+                logger.info("Consumer task cancelled")
+        
         await container.shutdown()
         
-        # Clean up preprocessing client
         preprocessing_client = get_preprocessing_client()
         await preprocessing_client.close()
         logger.info("All resources closed")
     except Exception as e:
         logger.error(f"Error during shutdown: {e}", exc_info=True)
+
+
 
 
 app = FastAPI(
